@@ -203,6 +203,7 @@ serve((req: any): Response | Promise<Response> => {
 // curl -i --location --request GET 'https://vfiomlqwajbenjwswajz.functions.supabase.co/index/scales/history' \
 //   --header 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0' \
 //   --header 'Content-Type: application/json' \
-//   --data '{"method":"GET"}'
+
 
 //curl -L -X GET 'http://localhost:54321/index/scales/history' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmaW9tbHF3YWpiZW5qd3N3YWp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2NzQwMjc1MTYsImV4cCI6MTk4OTYwMzUxNn0.hvG2Wpfq3SHFq1I6SW_YJZ71ge-0y6ksEXuEjbkgnKM'
+//curl -L -X POST 'https://vfiomlqwajbenjwswajz.functions.supabase.co/index' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmaW9tbHF3YWpiZW5qd3N3YWp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2NzQwMjc1MTYsImV4cCI6MTk4OTYwMzUxNn0.hvG2Wpfq3SHFq1I6SW_YJZ71ge-0y6ksEXuEjbkgnKM' --data '{"name":"Functions"}'
