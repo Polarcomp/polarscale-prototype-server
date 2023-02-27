@@ -3,10 +3,11 @@
 // This enables autocomplete, go to definition, etc.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-//import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
 import { InfluxDB, flux } from 'https://unpkg.com/@influxdata/influxdb-client-browser/dist/index.browser.mjs'
 import moment from "https://deno.land/x/momentjs@2.29.1-deno/mod.ts";
+import * as uuid from "https://deno.land/std@0.175.0/uuid/mod.ts";
 
 const influxParameters = {
   url: Deno.env.get('INFLUX_URL'),
@@ -15,6 +16,24 @@ const influxParameters = {
   bucket: Deno.env.get('INFLUX_BUCKET')
 }
 const queryApi = new InfluxDB({ url: influxParameters.url, token: influxParameters.token }).getQueryApi(influxParameters.org);
+
+async function getScales(supabaseClient: SupabaseClient, params: URLSearchParams): Promise<Response> {
+  const user_id: string = params.get('user_id') || '';
+  if (!uuid.validate(user_id)) {
+    return new Response(JSON.stringify({ error: 'invalid user id'}),
+    {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 400
+    });
+  }
+  const {data, error} = await supabaseClient.from('scales').select('device_id, name').eq('user_id', user_id);
+  if (error) throw error;
+  return new Response(JSON.stringify(data),
+  {
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    status: 200
+  });
+}
 
 const extractReadings = (obj: any) => {
   const res: {[index: string]: any } = {};
@@ -180,8 +199,16 @@ serve((req: any): Response | Promise<Response> => {
     const response = new Response('ok', { headers: corsHeaders })
     return response
   }
+
   try {
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization') ! } } }
+    )
     switch (true) {
+      case method === 'GET' && url.pathname === '/index/scales/scales':
+        return getScales(supabaseClient, params);
       case method === 'GET' && url.pathname === '/index/scales/history':
         return getHistory(params);
       case method === 'GET' && url.pathname === '/index/scales/accumulated':
