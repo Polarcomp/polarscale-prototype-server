@@ -29,13 +29,14 @@ async function getScales(supabaseClient: SupabaseClient, params: URLSearchParams
 
 function getHistory(params: URLSearchParams): Promise<Response> {
   const range: number = parseInt(params.get('range') || '0');
+  const user_id: string = params.get('user_id') || '';
   const frequency = range * 5;
   const scaleHistoryQuery = `
     from(bucket: "${influxParameters.bucket}")
         |> range(start: -${range}h)
         |> filter(fn: (r) => r["_measurement"] == "weight_measurement")
         |> filter(fn: (r) => r["_field"] == "weight")
-        |> filter(fn: (r) => r["user_id"] == "test-user1")
+        |> filter(fn: (r) => r["user_id"] == "${user_id}")
         |> aggregateWindow(every: ${frequency}s, fn: mean)
         |> fill(column: "_value", usePrevious: true)
         |> pivot(rowKey:["_time"], columnKey: ["device_id"], valueColumn: "_value")
@@ -46,13 +47,14 @@ function getHistory(params: URLSearchParams): Promise<Response> {
 
 function getAccumulated(params: URLSearchParams): Promise<Response> {
   const range: number = parseInt(params.get('range') || '0');
+  const user_id: string = params.get('user_id') || '';
   const frequency = range * 5;
   const scaleHistoryQuery = `
   from(bucket: "${influxParameters.bucket}")
       |> range(start: -${range}h)
       |> filter(fn: (r) => r["_measurement"] == "weight_measurement")
       |> filter(fn: (r) => r["_field"] == "weight")
-      |> filter(fn: (r) => r["user_id"] == "test-user1")
+      |> filter(fn: (r) => r["user_id"] == "${user_id}")
       |> aggregateWindow(every: ${frequency}s, fn: mean)
       |> fill(column: "_value", usePrevious: true)
       |> pivot(rowKey:["_time"], columnKey: ["device_id"], valueColumn: "_value")
@@ -61,17 +63,18 @@ function getAccumulated(params: URLSearchParams): Promise<Response> {
   return queryAccumulatedRows(clientQuery);
 }
 
-function getLatest(): Promise<Response> {
-  let array = [];
+function getLatest(params: URLSearchParams): Promise<Response> {
+  const user_id: string = params.get('user_id') || '';
   const scaleCurrentQuery = `
   from(bucket: "${influxParameters.bucket}")
       |> range(start: -2d)
       |> filter(fn: (r) => r["_measurement"] == "weight_measurement")
       |> filter(fn: (r) => r["_field"] == "weight")
+      |> filter(fn: (r) => r["user_id"] == "${user_id}")
       |> group(columns: ["device_id"])
       |> last()
       |> yield(name: "latest")`;
-  let clientQuery = flux`` + scaleCurrentQuery;
+  const clientQuery = flux`` + scaleCurrentQuery;
   return queryLatest(clientQuery);
 }
 
@@ -98,7 +101,7 @@ serve((req: any): Response | Promise<Response> => {
       case method === 'GET' && url.pathname === '/index/scales/accumulated':
         return getAccumulated(params);
       case method === 'GET' && url.pathname === '/index/scales/latest':
-        return getLatest();
+        return getLatest(params);
       default:
         return responseError(JSON.stringify({ error: "Invalid URL parameter"}));
     }
@@ -113,11 +116,17 @@ serve((req: any): Response | Promise<Response> => {
 //   --header 'Content-Type: application/json' \
 //   --data '{"method":"GET"}'
 
-//curl -L -X GET 'http://localhost:54321/functions/v1/index/scales/history?range=1' \
+//curl -L -X GET 'http://localhost:54321/functions/v1/index/scales/history?range=1&user_id=e32f5583-c101-4bac-97eb-b77fe01109f' \
 //-H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
 
-//curl -L -X GET 'http://localhost:54321/functions/v1/index/scales/scales?user_id=e32f5583-c101-4bac-97eb-b77fe01109f1' \
+//curl -L -X GET 'http://localhost:54321/functions/v1/index/scales/scales?user_id=e32f5583-c101-4bac-97eb-b77fe01109f' \
 //-H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
 
 // To invoke remote deployed
-//curl -L -X GET 'https://vfiomlqwajbenjwswajz.functions.supabase.co/index/scales/history' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmaW9tbHF3YWpiZW5qd3N3YWp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2NzQwMjc1MTYsImV4cCI6MTk4OTYwMzUxNn0.hvG2Wpfq3SHFq1I6SW_YJZ71ge-0y6ksEXuEjbkgnKM' --data '{"name":"Functions"}'
+//curl -L -X GET 'https://vfiomlqwajbenjwswajz.functions.supabase.co/index/scales/history?range=1&user_id=e32f5583-c101-4bac-97eb-b77fe01109f' \
+//-H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmaW9tbHF3YWpiZW5qd3N3YWp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2NzQwMjc1MTYsImV4cCI6MTk4OTYwMzUxNn0.hvG2Wpfq3SHFq1I6SW_YJZ71ge-0y6ksEXuEjbkgnKM' \
+//--data '{"name":"Functions"}'
+
+//curl -L -X GET 'https://vfiomlqwajbenjwswajz.functions.supabase.co/index/scales/scales?user_id=e32f5583-c101-4bac-97eb-b77fe01109f' \
+//-H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmaW9tbHF3YWpiZW5qd3N3YWp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2NzQwMjc1MTYsImV4cCI6MTk4OTYwMzUxNn0.hvG2Wpfq3SHFq1I6SW_YJZ71ge-0y6ksEXuEjbkgnKM' \
+//--data '{"name":"Functions"}'
