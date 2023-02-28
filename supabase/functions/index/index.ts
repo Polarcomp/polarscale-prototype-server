@@ -116,17 +116,17 @@ serve((req: any): Response | Promise<Response> => {
 //   --header 'Content-Type: application/json' \
 //   --data '{"method":"GET"}'
 
-//curl -L -X GET 'http://localhost:54321/functions/v1/index/scales/history?range=1&user_id=e32f5583-c101-4bac-97eb-b77fe01109f' \
+//curl -L -X GET 'http://localhost:54321/functions/v1/index/scales/history?range=1&user_id=e32f5583-c101-4bac-97eb-b77fe01109f1' \
 //-H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
 
-//curl -L -X GET 'http://localhost:54321/functions/v1/index/scales/scales?user_id=e32f5583-c101-4bac-97eb-b77fe01109f' \
+//curl -L -X GET 'http://localhost:54321/functions/v1/index/scales/scales?user_id=e32f5583-c101-4bac-97eb-b77fe01109f1' \
 //-H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
 
 // To invoke remote deployed
-//curl -L -X GET 'https://vfiomlqwajbenjwswajz.functions.supabase.co/index/scales/history?range=1&user_id=e32f5583-c101-4bac-97eb-b77fe01109f' \
+//curl -L -X GET 'https://vfiomlqwajbenjwswajz.functions.supabase.co/index/scales/history?range=1&user_id=e32f5583-c101-4bac-97eb-b77fe01109f1' \
 //-H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmaW9tbHF3YWpiZW5qd3N3YWp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2NzQwMjc1MTYsImV4cCI6MTk4OTYwMzUxNn0.hvG2Wpfq3SHFq1I6SW_YJZ71ge-0y6ksEXuEjbkgnKM' \
 //--data '{"name":"Functions"}'
 
-//curl -L -X GET 'https://vfiomlqwajbenjwswajz.functions.supabase.co/index/scales/scales?user_id=e32f5583-c101-4bac-97eb-b77fe01109f' \
+//curl -L -X GET 'https://vfiomlqwajbenjwswajz.functions.supabase.co/index/scales/scales?user_id=e32f5583-c101-4bac-97eb-b77fe01109f1' \
 //-H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmaW9tbHF3YWpiZW5qd3N3YWp6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE2NzQwMjc1MTYsImV4cCI6MTk4OTYwMzUxNn0.hvG2Wpfq3SHFq1I6SW_YJZ71ge-0y6ksEXuEjbkgnKM' \
 //--data '{"name":"Functions"}'
