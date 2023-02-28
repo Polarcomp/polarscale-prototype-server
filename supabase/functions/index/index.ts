@@ -4,9 +4,10 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { queryHistoryRows, queryAccumulatedRows, queryLatest } from "./influxdbQueries.ts"
 import { corsHeaders } from '../_shared/cors.ts'
-import { InfluxDB, flux } from 'https://unpkg.com/@influxdata/influxdb-client-browser/dist/index.browser.mjs'
-import moment from "https://deno.land/x/momentjs@2.29.1-deno/mod.ts";
+import { responseOK, responseError } from "./responses.ts"
+import { flux } from 'https://unpkg.com/@influxdata/influxdb-client-browser/dist/index.browser.mjs'
 import * as uuid from "https://deno.land/std@0.175.0/uuid/mod.ts";
 
 const influxParameters = {
@@ -15,64 +16,18 @@ const influxParameters = {
   org: Deno.env.get('ORG_ID'),
   bucket: Deno.env.get('INFLUX_BUCKET')
 }
-const queryApi = new InfluxDB({ url: influxParameters.url, token: influxParameters.token }).getQueryApi(influxParameters.org);
 
 async function getScales(supabaseClient: SupabaseClient, params: URLSearchParams): Promise<Response> {
   const user_id: string = params.get('user_id') || '';
   if (!uuid.validate(user_id)) {
-    return new Response(JSON.stringify({ error: 'invalid user id'}),
-    {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 400
-    });
+    return responseError(JSON.stringify({ error: 'invalid user id'}))
   }
   const {data, error} = await supabaseClient.from('scales').select('device_id, name').eq('user_id', user_id);
   if (error) throw error;
-  return new Response(JSON.stringify(data),
-  {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-    status: 200
-  });
+  return responseOK(JSON.stringify(data));
 }
 
-const extractReadings = (obj: any) => {
-  const res: {[index: string]: any } = {};
-  const scales: string[] = Object.keys(obj).filter(key => key.startsWith('id_'));
-  scales.forEach(id => res[id] = obj[id] ? obj[id] : 0);
-  return res;
-}
-
-const queryHistoryRows = async (clientQuery: string): Promise<Response> => {
-  const readings: any[] = [];
-  let timePeriod = {
-    start: 0,
-    stop: 0
-  }
-  for await (const {values, tableMeta} of queryApi.iterateRows(clientQuery)) {
-    const obj = tableMeta.toObject(values);
-    let point: { timestamp: number; } = { timestamp: 0, ...extractReadings(obj)};
-    point["timestamp"] = parseInt(moment(obj._time).format('X'));
-    readings.push(point);
-    if (!timePeriod.start || !timePeriod.stop)
-    {
-      timePeriod = {
-        start: parseInt(moment(obj._start).format('X')),
-        stop: parseInt(moment(obj._stop).format('X'))
-      }
-    }
-  }
-  const response = {
-    timePeriod: timePeriod,
-    readings: readings
-  }
-  return new Response(JSON.stringify(response),
-  {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-    status: 200
-  });
-}
-
-async function getHistory(params: URLSearchParams): Promise<Response> {
+function getHistory(params: URLSearchParams): Promise<Response> {
   const range: number = parseInt(params.get('range') || '0');
   const frequency = range * 5;
   const scaleHistoryQuery = `
@@ -89,53 +44,7 @@ async function getHistory(params: URLSearchParams): Promise<Response> {
   return queryHistoryRows(clientQuery);
 }
 
-const accumulateValues = (obj: any, previousValues: any, totals: any) => {
-  const currentValues: {[index: string]: any } = {};
-  const diffs: {[index: string]: any } = {};
-  const scales = Object.keys(obj).filter(key => key.startsWith('id_'));
-  scales.forEach(id => {
-      currentValues[id] = obj[id] ? obj[id] : 0;
-      diffs[id] = currentValues[id] - previousValues[id];
-      if (!(id in totals))
-          totals[id] = 0;
-      totals[id] += diffs[id] > 0 ? diffs[id] : 0;
-      previousValues[id] = currentValues[id];
-  });
-  return totals;
-}
-
-const queryAccumulatedRows = async (clientQuery: string): Promise<Response> => {
-  let readings: any[] = [];
-  let previousValues = {};
-  let totals = {};
-  let timePeriod = {
-    start: 0,
-    stop: 0
-  }
-  for await (const {values, tableMeta} of queryApi.iterateRows(clientQuery)) {
-    const obj = tableMeta.toObject(values);
-    let point: any = {...accumulateValues(obj, previousValues, totals)}
-    point["timestamp"] = parseInt(moment(obj._time).format('X'));
-    readings.push(point);
-    if (!timePeriod.start || !timePeriod.stop)
-    {
-      timePeriod = {
-        start: parseInt(moment(obj._start).format('X')),
-        stop: parseInt(moment(obj._stop).format('X'))
-      }
-    }
-  }
-  const response = {
-    timePeriod: timePeriod,
-    readings: readings
-  }
-  return new Response(JSON.stringify(response), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-    status: 200
-  });
-}
-
-async function getAccumulated(params: URLSearchParams): Promise<Response> {
+function getAccumulated(params: URLSearchParams): Promise<Response> {
   const range: number = parseInt(params.get('range') || '0');
   const frequency = range * 5;
   const scaleHistoryQuery = `
@@ -152,24 +61,7 @@ async function getAccumulated(params: URLSearchParams): Promise<Response> {
   return queryAccumulatedRows(clientQuery);
 }
 
-const queryLatest = async (clientQuery: string): Promise<Response> => {
-  let array = [];
-  for await (const {values, tableMeta} of queryApi.iterateRows(clientQuery)) {
-    let obj = tableMeta.toObject(values);
-    const point = {
-      time: obj._time,
-      weight: obj._value,
-      device_id: obj.device_id
-    }
-    array.push(point);
-  }
-  return new Response(JSON.stringify(array), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-    status: 200
-  });
-}
-
-async function getLatest(): Promise<Response> {
+function getLatest(): Promise<Response> {
   let array = [];
   const scaleCurrentQuery = `
   from(bucket: "${influxParameters.bucket}")
@@ -181,14 +73,6 @@ async function getLatest(): Promise<Response> {
       |> yield(name: "latest")`;
   let clientQuery = flux`` + scaleCurrentQuery;
   return queryLatest(clientQuery);
-}
-
-const returnError = (error: any): Response => {
-  console.error(error);
-  return new Response(JSON.stringify({ error: error.message }), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-    status: 400
-  })
 }
 
 serve((req: any): Response | Promise<Response> => {
@@ -216,10 +100,10 @@ serve((req: any): Response | Promise<Response> => {
       case method === 'GET' && url.pathname === '/index/scales/latest':
         return getLatest();
       default:
-        return returnError("Invalid url parameter");
+        return responseError(JSON.stringify({ error: "Invalid URL parameter"}));
     }
   } catch (error) {
-    return returnError(error);
+    return responseError(JSON.stringify(error));
   }
 })
 
@@ -230,6 +114,9 @@ serve((req: any): Response | Promise<Response> => {
 //   --data '{"method":"GET"}'
 
 //curl -L -X GET 'http://localhost:54321/functions/v1/index/scales/history?range=1' \
+//-H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
+
+//curl -L -X GET 'http://localhost:54321/functions/v1/index/scales/scales?user_id=e32f5583-c101-4bac-97eb-b77fe01109f1' \
 //-H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
 
 // To invoke remote deployed
