@@ -18,7 +18,7 @@ const extractReadings = (obj: any) => {
     return res;
   }
   
-const queryHistoryRows = async (clientQuery: string): Promise<Response> => {
+const queryHistoryRows = async (clientQuery: string): Promise<{ timePeriod: {start: number; stop: number; }; readings: any[];}> => {
     const readings: any[] = [];
     let timePeriod = {
       start: 0,
@@ -37,11 +37,7 @@ const queryHistoryRows = async (clientQuery: string): Promise<Response> => {
         }
       }
     }
-    const response = {
-      timePeriod: timePeriod,
-      readings: readings
-    }
-    return responseOK(JSON.stringify(response));
+    return { timePeriod: timePeriod, readings: readings }
 }
 
 const accumulateValues = (obj: any, previousValues: any, totals: any) => {
@@ -59,7 +55,7 @@ const accumulateValues = (obj: any, previousValues: any, totals: any) => {
     return totals;
   }
   
-const queryAccumulatedRows = async (clientQuery: string): Promise<Response> => {
+const queryAccumulatedRows = async (clientQuery: string): Promise<{ timePeriod: {start: number; stop: number; }; readings: any[];}> => {
     let readings: any[] = [];
     let previousValues = {};
     let totals = {};
@@ -80,14 +76,10 @@ const queryAccumulatedRows = async (clientQuery: string): Promise<Response> => {
         }
       }
     }
-    const response = {
-      timePeriod: timePeriod,
-      readings: readings
-    }
-    return responseOK(JSON.stringify(response));
+    return { timePeriod: timePeriod, readings: readings }
 }
 
-const queryLatest = async (clientQuery: string): Promise<Response> => {
+const queryLatest = async (clientQuery: string): Promise<any[]> => {
     let array = [];
     for await (const {values, tableMeta} of queryApi.iterateRows(clientQuery)) {
       let obj = tableMeta.toObject(values);
@@ -98,7 +90,12 @@ const queryLatest = async (clientQuery: string): Promise<Response> => {
       }
       array.push(point);
     }
-    return responseOK(JSON.stringify(array));
+    return array;
 }
 
-export { queryHistoryRows, queryAccumulatedRows, queryLatest};
+const queryTotal = async (clientQuery: string): Promise<{ timePeriod: {start: number; stop: number;}; total: any[]}> => {
+  const accumulatedRows = await queryAccumulatedRows(clientQuery);
+  return { timePeriod: accumulatedRows.timePeriod, total: accumulatedRows.readings.pop()};
+}
+  
+export { queryHistoryRows, queryAccumulatedRows, queryLatest, queryTotal };

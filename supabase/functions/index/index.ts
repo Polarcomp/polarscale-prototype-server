@@ -4,7 +4,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { queryHistoryRows, queryAccumulatedRows, queryLatest } from "./influxdbQueries.ts"
+import { queryHistoryRows, queryAccumulatedRows, queryLatest, queryTotal } from "./influxdbQueries.ts"
 import { corsHeaders } from '../_shared/cors.ts'
 import { responseOK, responseError } from "./responses.ts"
 import { flux } from 'https://unpkg.com/@influxdata/influxdb-client-browser/dist/index.browser.mjs'
@@ -27,7 +27,7 @@ async function getScales(supabaseClient: SupabaseClient, params: URLSearchParams
   return responseOK(JSON.stringify(data));
 }
 
-function getHistory(params: URLSearchParams): Promise<Response> {
+async function getHistory(params: URLSearchParams): Promise<Response> {
   const range: number = parseInt(params.get('range') || '0');
   const user_id: string = params.get('user_id') || '';
   const frequency = range * 5;
@@ -42,10 +42,11 @@ function getHistory(params: URLSearchParams): Promise<Response> {
         |> pivot(rowKey:["_time"], columnKey: ["device_id"], valueColumn: "_value")
         |> yield(name: "mean")`;
   const clientQuery: string = flux`` + scaleHistoryQuery;
-  return queryHistoryRows(clientQuery);
+  const response = await queryHistoryRows(clientQuery);
+  return responseOK(JSON.stringify(response));
 }
 
-function getAccumulated(params: URLSearchParams): Promise<Response> {
+async function getAccumulated(params: URLSearchParams): Promise<Response> {
   const range: number = parseInt(params.get('range') || '0');
   const user_id: string = params.get('user_id') || '';
   const frequency = range * 5;
@@ -60,10 +61,11 @@ function getAccumulated(params: URLSearchParams): Promise<Response> {
       |> pivot(rowKey:["_time"], columnKey: ["device_id"], valueColumn: "_value")
       |> yield(name: "mean")`;
   const clientQuery: string = flux`` + scaleHistoryQuery;
-  return queryAccumulatedRows(clientQuery);
+  const response = await queryAccumulatedRows(clientQuery);
+  return responseOK(JSON.stringify(response));
 }
 
-function getLatest(params: URLSearchParams): Promise<Response> {
+async function getLatest(params: URLSearchParams): Promise<Response> {
   const user_id: string = params.get('user_id') || '';
   const scaleCurrentQuery = `
   from(bucket: "${influxParameters.bucket}")
@@ -75,7 +77,27 @@ function getLatest(params: URLSearchParams): Promise<Response> {
       |> last()
       |> yield(name: "latest")`;
   const clientQuery = flux`` + scaleCurrentQuery;
-  return queryLatest(clientQuery);
+  const response = await queryLatest(clientQuery);
+  return responseOK(JSON.stringify(response));
+}
+
+async function getTotal(params: URLSearchParams): Promise<Response> {
+  const range: number = parseInt(params.get('range') || '0');
+  const user_id: string = params.get('user_id') || '';
+  const frequency = range * 5;
+  const scaleHistoryQuery = `
+  from(bucket: "${influxParameters.bucket}")
+      |> range(start: -${range}h)
+      |> filter(fn: (r) => r["_measurement"] == "weight_measurement")
+      |> filter(fn: (r) => r["_field"] == "weight")
+      |> filter(fn: (r) => r["user_id"] == "${user_id}")
+      |> aggregateWindow(every: ${frequency}s, fn: mean)
+      |> fill(column: "_value", usePrevious: true)
+      |> pivot(rowKey:["_time"], columnKey: ["device_id"], valueColumn: "_value")
+      |> yield(name: "mean")`;
+  const clientQuery: string = flux`` + scaleHistoryQuery;
+  const response = await queryTotal(clientQuery);
+  return responseOK(JSON.stringify(response));
 }
 
 serve((req: any): Response | Promise<Response> => {
@@ -102,6 +124,8 @@ serve((req: any): Response | Promise<Response> => {
         return getAccumulated(params);
       case method === 'GET' && url.pathname === '/index/scales/latest':
         return getLatest(params);
+      case method === 'GET' && url.pathname === '/index/scales/total':
+        return getTotal(params);
       default:
         return responseError(JSON.stringify({ error: "Invalid URL parameter"}));
     }
