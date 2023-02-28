@@ -19,9 +19,6 @@ const influxParameters = {
 
 async function getScales(supabaseClient: SupabaseClient, params: URLSearchParams): Promise<Response> {
   const user_id: string = params.get('user_id') || '';
-  if (!uuid.validate(user_id)) {
-    return responseError(JSON.stringify({ error: 'invalid user id'}))
-  }
   const {data, error} = await supabaseClient.from('scales').select('device_id, name').eq('user_id', user_id);
   if (error) throw error;
   return responseOK(JSON.stringify(data));
@@ -115,6 +112,9 @@ serve((req: any): Response | Promise<Response> => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: req.headers.get('Authorization') ! } } }
     )
+    if (!uuid.validate(params.get('user_id') || '')) {
+      return responseError(JSON.stringify({ error: 'invalid user id'}))
+    }
     switch (true) {
       case method === 'GET' && url.pathname === '/index/scales/scales':
         return getScales(supabaseClient, params);
