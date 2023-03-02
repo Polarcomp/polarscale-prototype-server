@@ -1,7 +1,5 @@
-import { corsHeaders } from '../_shared/cors.ts'
 import moment from "https://deno.land/x/momentjs@2.29.1-deno/mod.ts";
 import { InfluxDB } from 'https://unpkg.com/@influxdata/influxdb-client-browser/dist/index.browser.mjs'
-import { responseOK, responseError } from './responses.ts';
 
 const influxParameters = {
   url: Deno.env.get('INFLUX_URL'),
