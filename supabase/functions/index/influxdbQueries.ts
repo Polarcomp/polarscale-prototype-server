@@ -54,7 +54,6 @@ const queryLatest = async (clientQuery: string): Promise<any[]> => {
 
 const queryTotal = async (clientQuery: string): Promise<{ timePeriod: {start: number; stop: number;}; total: any[]}> => {
   const accumulatedRows = await queryRows(clientQuery);
-  console.log(accumulatedRows)
   return { timePeriod: accumulatedRows.timePeriod, total: accumulatedRows.readings.pop()};
 }
   
