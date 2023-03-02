@@ -74,13 +74,12 @@ async function getLatest(params: URLSearchParams): Promise<Response> {
   const user_id: string = params.get('user_id') || '';
   const scaleCurrentQuery = `
   from(bucket: "${influxParameters.bucket}")
-      |> range(start: -2d)
+      |> range(start: 0)
       |> filter(fn: (r) => r["_measurement"] == "weight_measurement")
       |> filter(fn: (r) => r["_field"] == "weight")
       |> filter(fn: (r) => r["user_id"] == "${user_id}")
       |> group(columns: ["device_id"])
-      |> last()
-      |> yield(name: "latest")`;
+      |> last()`;
   const clientQuery = flux`` + scaleCurrentQuery;
   const response = await queryLatest(clientQuery);
   return responseOK(JSON.stringify(response));
@@ -104,7 +103,7 @@ async function getTotal(params: URLSearchParams): Promise<Response> {
       |> drop(columns: ["_value_dup"])
       |> filter(fn: (r) => r["_value"] >= 0.0)
       |> sum()
-      |> pivot(rowKey: [],columnKey: ["device_id"], valueColumn: "_value")
+      |> pivot(rowKey: [], columnKey: ["device_id"], valueColumn: "_value")
   `;
   const clientQuery: string = flux`` + scaleCumulativeQuery;
   const response = await queryTotal(clientQuery);
