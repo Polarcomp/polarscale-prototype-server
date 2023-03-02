@@ -4,7 +4,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { queryHistoryRows, queryAccumulatedRows, queryLatest, queryTotal } from "./influxdbQueries.ts"
+import { queryRows, queryLatest, queryTotal } from "./influxdbQueries.ts"
 import { corsHeaders } from '../_shared/cors.ts'
 import { responseOK, responseError } from "./responses.ts"
 import { flux } from 'https://unpkg.com/@influxdata/influxdb-client-browser/dist/index.browser.mjs'
@@ -39,26 +39,34 @@ async function getHistory(params: URLSearchParams): Promise<Response> {
         |> pivot(rowKey:["_time"], columnKey: ["device_id"], valueColumn: "_value")
         |> yield(name: "mean")`;
   const clientQuery: string = flux`` + scaleHistoryQuery;
-  const response = await queryHistoryRows(clientQuery);
+  const response = await queryRows(clientQuery);
   return responseOK(JSON.stringify(response));
 }
 
-async function getAccumulated(params: URLSearchParams): Promise<Response> {
+async function getAccumulated(params: URLSearchParams) {
   const range: number = parseInt(params.get('range') || '0');
   const user_id: string = params.get('user_id') || '';
   const frequency = range * 5;
-  const scaleHistoryQuery = `
+  const scaleCumulativeQuery = `
   from(bucket: "${influxParameters.bucket}")
       |> range(start: -${range}h)
       |> filter(fn: (r) => r["_measurement"] == "weight_measurement")
       |> filter(fn: (r) => r["_field"] == "weight")
       |> filter(fn: (r) => r["user_id"] == "${user_id}")
-      |> aggregateWindow(every: ${frequency}s, fn: mean)
-      |> fill(column: "_value", usePrevious: true)
+      |> duplicate(column: "_value", as: "_value_dup")
+      |> difference(keepFirst: true, columns: ["_value"])
+      |> map(fn: (r) => ({
+        r with device_id: "\${r.device_id}",
+        _value: if exists r._value then float(v: r._value) else float(v: r._value_dup)
+      }))
+      |> drop(columns: ["_value_dup"])
+      |> filter(fn: (r) => r["_value"] >= 0.0)
+      |> aggregateWindow(every: ${frequency}s, fn: sum)
+      |> cumulativeSum()
       |> pivot(rowKey:["_time"], columnKey: ["device_id"], valueColumn: "_value")
-      |> yield(name: "mean")`;
-  const clientQuery: string = flux`` + scaleHistoryQuery;
-  const response = await queryAccumulatedRows(clientQuery);
+  `;
+  const clientQuery: string = flux`` + scaleCumulativeQuery;
+  const response = await queryRows(clientQuery);
   return responseOK(JSON.stringify(response));
 }
 
@@ -81,18 +89,24 @@ async function getLatest(params: URLSearchParams): Promise<Response> {
 async function getTotal(params: URLSearchParams): Promise<Response> {
   const range: number = parseInt(params.get('range') || '0');
   const user_id: string = params.get('user_id') || '';
-  const frequency = range * 5;
-  const scaleHistoryQuery = `
+  const scaleCumulativeQuery = `
   from(bucket: "${influxParameters.bucket}")
       |> range(start: -${range}h)
       |> filter(fn: (r) => r["_measurement"] == "weight_measurement")
       |> filter(fn: (r) => r["_field"] == "weight")
       |> filter(fn: (r) => r["user_id"] == "${user_id}")
-      |> aggregateWindow(every: ${frequency}s, fn: mean)
-      |> fill(column: "_value", usePrevious: true)
-      |> pivot(rowKey:["_time"], columnKey: ["device_id"], valueColumn: "_value")
-      |> yield(name: "mean")`;
-  const clientQuery: string = flux`` + scaleHistoryQuery;
+      |> duplicate(column: "_value", as: "_value_dup")
+      |> difference(keepFirst: true, columns: ["_value"])
+      |> map(fn: (r) => ({
+        r with device_id: "\${r.device_id}",
+        _value: if exists r._value then float(v: r._value) else float(v: r._value_dup)
+      }))
+      |> drop(columns: ["_value_dup"])
+      |> filter(fn: (r) => r["_value"] >= 0.0)
+      |> sum()
+      |> pivot(rowKey: [],columnKey: ["device_id"], valueColumn: "_value")
+  `;
+  const clientQuery: string = flux`` + scaleCumulativeQuery;
   const response = await queryTotal(clientQuery);
   return responseOK(JSON.stringify(response));
 }

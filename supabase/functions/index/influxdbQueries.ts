@@ -18,7 +18,7 @@ const extractReadings = (obj: any) => {
     return res;
   }
   
-const queryHistoryRows = async (clientQuery: string): Promise<{ timePeriod: {start: number; stop: number; }; readings: any[];}> => {
+const queryRows = async (clientQuery: string): Promise<{ timePeriod: {start: number; stop: number; }; readings: any[];}> => {
     const readings: any[] = [];
     let timePeriod = {
       start: 0,
@@ -27,45 +27,6 @@ const queryHistoryRows = async (clientQuery: string): Promise<{ timePeriod: {sta
     for await (const {values, tableMeta} of queryApi.iterateRows(clientQuery)) {
       const obj = tableMeta.toObject(values);
       let point: { timestamp: number; } = { timestamp: 0, ...extractReadings(obj)};
-      point["timestamp"] = parseInt(moment(obj._time).format('X'));
-      readings.push(point);
-      if (!timePeriod.start || !timePeriod.stop)
-      {
-        timePeriod = {
-          start: parseInt(moment(obj._start).format('X')),
-          stop: parseInt(moment(obj._stop).format('X'))
-        }
-      }
-    }
-    return { timePeriod: timePeriod, readings: readings }
-}
-
-const accumulateValues = (obj: any, previousValues: any, totals: any) => {
-    const currentValues: {[index: string]: any } = {};
-    const diffs: {[index: string]: any } = {};
-    const scales = Object.keys(obj).filter(key => key.startsWith('id_'));
-    scales.forEach(id => {
-        currentValues[id] = obj[id] ? obj[id] : 0;
-        diffs[id] = currentValues[id] - previousValues[id];
-        if (!(id in totals))
-            totals[id] = 0;
-        totals[id] += diffs[id] > 0 ? diffs[id] : 0;
-        previousValues[id] = currentValues[id];
-    });
-    return totals;
-  }
-  
-const queryAccumulatedRows = async (clientQuery: string): Promise<{ timePeriod: {start: number; stop: number; }; readings: any[];}> => {
-    let readings: any[] = [];
-    let previousValues = {};
-    let totals = {};
-    let timePeriod = {
-      start: 0,
-      stop: 0
-    }
-    for await (const {values, tableMeta} of queryApi.iterateRows(clientQuery)) {
-      const obj = tableMeta.toObject(values);
-      let point: any = {...accumulateValues(obj, previousValues, totals)}
       point["timestamp"] = parseInt(moment(obj._time).format('X'));
       readings.push(point);
       if (!timePeriod.start || !timePeriod.stop)
@@ -94,8 +55,9 @@ const queryLatest = async (clientQuery: string): Promise<any[]> => {
 }
 
 const queryTotal = async (clientQuery: string): Promise<{ timePeriod: {start: number; stop: number;}; total: any[]}> => {
-  const accumulatedRows = await queryAccumulatedRows(clientQuery);
+  const accumulatedRows = await queryRows(clientQuery);
+  console.log(accumulatedRows)
   return { timePeriod: accumulatedRows.timePeriod, total: accumulatedRows.readings.pop()};
 }
   
-export { queryHistoryRows, queryAccumulatedRows, queryLatest, queryTotal };
+export { queryRows, queryLatest, queryTotal };
