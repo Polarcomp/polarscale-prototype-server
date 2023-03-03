@@ -70,6 +70,33 @@ async function getAccumulated(params: URLSearchParams) {
   return responseOK(JSON.stringify(response));
 }
 
+async function getDaily(params: URLSearchParams) {
+  const start: number = parseInt(params.get('start') || '0');
+  const stop: number = parseInt(params.get('stop') || '0');
+  const user_id: string = params.get('user_id') || '';
+  const frequency = '24h';
+  const scaleDailyQuery = `
+  from(bucket: "${influxParameters.bucket}")
+      |> range(start: ${start}, stop: ${stop})
+      |> filter(fn: (r) => r["_measurement"] == "weight_measurement")
+      |> filter(fn: (r) => r["_field"] == "weight")
+      |> filter(fn: (r) => r["user_id"] == "${user_id}")
+      |> duplicate(column: "_value", as: "_value_dup")
+      |> difference(keepFirst: true, columns: ["_value"])
+      |> map(fn: (r) => ({
+        r with device_id: "\${r.device_id}",
+        _value: if exists r._value then float(v: r._value) else float(v: r._value_dup)
+      }))
+      |> drop(columns: ["_value_dup"])
+      |> filter(fn: (r) => r["_value"] >= 0.0)
+      |> aggregateWindow(every: ${frequency}, fn: sum)
+      |> pivot(rowKey:["_time"], columnKey: ["device_id"], valueColumn: "_value")
+  `
+  const clientQuery: string = flux`` + scaleDailyQuery;
+  const response = await queryRows(clientQuery);
+  return responseOK(JSON.stringify(response));
+}
+
 async function getLatest(params: URLSearchParams): Promise<Response> {
   const user_id: string = params.get('user_id') || '';
   const scaleCurrentQuery = `
@@ -135,6 +162,8 @@ serve((req: any): Response | Promise<Response> => {
         return getHistory(params);
       case method === 'GET' && url.pathname === '/index/scales/accumulated':
         return getAccumulated(params);
+      case method === 'GET' && url.pathname === '/index/scales/daily':
+        return getDaily(params);
       case method === 'GET' && url.pathname === '/index/scales/latest':
         return getLatest(params);
       case method === 'GET' && url.pathname === '/index/scales/total':
