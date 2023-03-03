@@ -90,6 +90,7 @@ async function getDaily(params: URLSearchParams) {
       |> drop(columns: ["_value_dup"])
       |> filter(fn: (r) => r["_value"] >= 0.0)
       |> aggregateWindow(every: ${frequency}, fn: sum)
+      |> timeShift(duration: -${frequency})
       |> pivot(rowKey:["_time"], columnKey: ["device_id"], valueColumn: "_value")
   `
   const clientQuery: string = flux`` + scaleDailyQuery;
