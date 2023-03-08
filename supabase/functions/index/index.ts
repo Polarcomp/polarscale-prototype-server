@@ -82,15 +82,20 @@ async function getDaily(params: URLSearchParams) {
       |> filter(fn: (r) => r["_field"] == "weight")
       |> filter(fn: (r) => r["user_id"] == "${user_id}")
       |> duplicate(column: "_value", as: "_value_dup")
+      |> duplicate(column: "_start", as: "_start_dup")
+      |> duplicate(column: "_stop", as: "_stop_dup")
+      |> window(every: ${frequency}, createEmpty: true)
       |> difference(keepFirst: true, columns: ["_value"])
       |> map(fn: (r) => ({
         r with device_id: "\${r.device_id}",
-        _value: if exists r._value then float(v: r._value) else float(v: r._value_dup)
+        _value: if exists r._value then float(v: r._value) else float(v: r._value_dup),
+        _start: r._start_dup,
+        _stop: r._stop_dup,
+        table: 0
       }))
-      |> drop(columns: ["_value_dup"])
+      |> drop(columns: ["_value_dup", "_start_dup","_stop_dup"])
       |> filter(fn: (r) => r["_value"] >= 0.0)
-      |> aggregateWindow(every: ${frequency}, fn: sum)
-      |> timeShift(duration: -${frequency})
+      |> aggregateWindow(every: 24h, fn: sum)
       |> pivot(rowKey:["_time"], columnKey: ["device_id"], valueColumn: "_value")
   `
   const clientQuery: string = flux`` + scaleDailyQuery;
@@ -110,15 +115,20 @@ async function getDailyAccumulated(params: URLSearchParams) {
       |> filter(fn: (r) => r["_field"] == "weight")
       |> filter(fn: (r) => r["user_id"] == "${user_id}")
       |> duplicate(column: "_value", as: "_value_dup")
+      |> duplicate(column: "_start", as: "_start_dup")
+      |> duplicate(column: "_stop", as: "_stop_dup")
+      |> window(every: ${frequency}, createEmpty: true)
       |> difference(keepFirst: true, columns: ["_value"])
       |> map(fn: (r) => ({
         r with device_id: "\${r.device_id}",
-        _value: if exists r._value then float(v: r._value) else float(v: r._value_dup)
+        _value: if exists r._value then float(v: r._value) else float(v: r._value_dup),
+        _start: r._start_dup,
+        _stop: r._stop_dup,
+        table: 0
       }))
-      |> drop(columns: ["_value_dup"])
+      |> drop(columns: ["_value_dup", "_start_dup","_stop_dup"])
       |> filter(fn: (r) => r["_value"] >= 0.0)
-      |> aggregateWindow(every: ${frequency}, fn: sum)
-      |> timeShift(duration: -${frequency})
+      |> aggregateWindow(every: 24h, fn: sum)
       |> cumulativeSum()
       |> pivot(rowKey:["_time"], columnKey: ["device_id"], valueColumn: "_value")
   `
@@ -215,6 +225,9 @@ serve((req: any): Response | Promise<Response> => {
 //   --data '{"method":"GET"}'
 
 //curl -L -X GET 'http://localhost:54321/functions/v1/index/scales/history?range=1&user_id=e32f5583-c101-4bac-97eb-b77fe01109f1' \
+//-H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
+
+//curl -L -X GET 'http://localhost:54321/functions/v1/index/scales/daily?start=1676844000&stop=1678658400&user_id=e32f5583-c101-4bac-97eb-b77fe01109f1' \
 //-H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
 
 //curl -L -X GET 'http://localhost:54321/functions/v1/index/scales/scales?user_id=e32f5583-c101-4bac-97eb-b77fe01109f1' \
